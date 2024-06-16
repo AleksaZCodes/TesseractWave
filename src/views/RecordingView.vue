@@ -1,5 +1,7 @@
 <template>
   <div class="h-screen p-2 flex flex-col gap-2 justify-between">
+    <NavBar />
+
     <div class="card h-full overflow-hidden" ref="chartContainer">
       <canvas
         v-if="sampling"
@@ -133,6 +135,7 @@
 </template>
 
 <script setup>
+import NavBar from '@/components/NavBar.vue'
 import { SmoothieChart, TimeSeries } from 'smoothie'
 import { onMounted, onUnmounted, ref } from 'vue'
 
