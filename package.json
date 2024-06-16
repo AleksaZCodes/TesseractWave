@@ -17,6 +17,7 @@
     "@tailwindcss/typography": "^0.5.13",
     "daisyui": "^4.12.2",
     "pinia": "^2.1.7",
+    "smoothie": "^1.36.1",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"
   },
