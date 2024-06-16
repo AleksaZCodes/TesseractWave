@@ -1,7 +1,19 @@
 <template>
   <div class="h-screen p-2 flex flex-col gap-2 justify-between">
-    <div class="card flex-grow overflow-hidden" ref="chartContainer">
-      <canvas id="chart" :width="canvasWidth" :height="canvasHeight"></canvas>
+    <div class="card h-full overflow-hidden" ref="chartContainer">
+      <canvas
+        v-if="sampling"
+        id="chart"
+        :width="canvasWidth"
+        :height="canvasHeight"
+        class="bg-base-200"
+      ></canvas>
+      <div
+        v-else
+        class="skeleton bg-base-200 w-full h-full flex justify-center items-center gap-2 italic"
+      >
+        <i class="fa-solid fa-chart-line"></i> One chart layout
+      </div>
       <!-- <div class="flex justify-around items-center w-full gap-2"> -->
       <!-- <Slider class="w-[60%]" v-model="xresolution" :min="1" :max="100" :step="1" /> -->
 
@@ -14,6 +26,7 @@
 
     <div class="card flex flex-row justify-center items-center gap-2">
       <button
+        v-if="!sampling"
         class="btn"
         :disabled="loading || sampling"
         @click="connected ? disconnect() : connect()"
@@ -28,34 +41,91 @@
         {{ connected ? 'Disconnect' : 'Connect' }}
       </button>
 
+      <button v-else class="btn" :disabled="loading || !sampling" @click="mark()">
+        <i class="fa-solid fa-scissors text-primary"></i> Mark
+      </button>
+
       <button class="btn" v-if="connected" @click="sampling ? stopSampling() : startSampling()">
         <i
           class="fa-solid"
           :class="[
-            sampling ? 'text-red-400 fa-stop' : 'text-primary fa-play',
+            sampling ? 'text-red-400 fa-xmark' : 'text-primary fa-play',
             loading ? 'fa-fade' : ''
           ]"
         ></i>
-        {{ sampling ? 'Stop' : 'Start' }}
+        {{ sampling ? 'Close' : 'Open' }}
+      </button>
+
+      <button class="btn" v-if="sampling" @click="recording ? stopRecording() : startRecording()">
+        <i
+          class="fa-solid"
+          :class="[
+            recording ? 'text-red-400 fa-stop' : 'text-primary fa-circle',
+            loading ? 'fa-fade' : ''
+          ]"
+        ></i>
+        {{ recording ? 'Finish' : 'Record' }}
       </button>
 
       <button
         class="btn"
-        v-if="connected"
+        v-if="connected && !sampling"
         onclick="options.showModal()"
         :disabled="loading || sampling"
       >
-        <i class="fa-solid fa-gear"></i> Options
+        <i class="fa-solid fa-sliders"></i> Options
       </button>
     </div>
   </div>
   <dialog id="options" class="modal">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg">Hello!</h3>
-      <p class="py-4">Press ESC key or click the button below to close</p>
+    <div class="modal-box prose">
+      <h3 class="font-bold">Recording options</h3>
+
+      <h4>Sampling rate</h4>
+      <div class="flex gap-2 justify-between items-center">
+        <input
+          type="range"
+          min="100"
+          max="1000"
+          v-model="samplingRate"
+          class="range range-primary"
+          step="100"
+        />
+        <span class="w-[4.5ch] text-right">{{ samplingRate }}</span>
+      </div>
+
+      <h4>Used channels</h4>
+      <div class="flex gap-2 justify-between items-center mb-4">
+        <input
+          type="range"
+          min="1"
+          max="6"
+          v-model="usedChannels"
+          class="range range-primary"
+          step="1"
+        />
+        <span class="w-[4.5ch] text-right">{{ usedChannels }}</span>
+      </div>
+      <!-- <div class="grid grid-cols-6 gap-3 md:gap-5">
+        <label class="swap swap-flip" v-for="label in channelLabels" :key="label">
+          <input type="checkbox" />
+
+          <div
+            class="swap-on card w-10 md:w-12 bg-primary text-base-100 font-bold aspect-square justify-center items-center"
+          >
+            {{ label }}
+          </div>
+          <div
+            class="swap-off card w-10 md:w-12 bg-base-200 font-bold aspect-square justify-center items-center"
+          >
+            {{ label }}
+          </div>
+        </label>
+      </div> -->
+
       <div class="modal-action">
         <form method="dialog">
-          <button class="btn">Save</button>
+          <button class="btn">Close</button>
         </form>
       </div>
     </div>
@@ -74,15 +144,16 @@ const channels = ref([])
 const channelTimeSeries = ref([]) // Array to hold TimeSeries for each channel
 const channelLabels = ref([])
 const sampling = ref(false)
+const recording = ref(false)
 const usedChannels = ref(6)
-const samplingRate = ref(1000)
+const samplingRate = ref(100)
 const readPromise = ref(null)
 const chartContainer = ref(null)
 const canvasWidth = ref(800) // Initial width
 const canvasHeight = ref(800) // Initial height
 
 const smoothie = new SmoothieChart({
-  millisPerPixel: 5,
+  millisPerPixel: 4,
   grid: { fillStyle: '#00000000', strokeStyle: '#00000000', borderVisible: false },
   labels: { disabled: true, intermediateLabelSameAxis: false },
   tooltipLine: { strokeStyle: '#bbbbbb' },
@@ -97,13 +168,12 @@ const createChannelTimeSeries = () => {
   for (let i = 0; i < usedChannels.value; i++) {
     const series = new TimeSeries()
     channelTimeSeries.value.push(series)
-    console.log('channel')
 
     smoothie.addTimeSeries(series, {
       lineWidth: 3,
-      strokeStyle: `hsl(${(i * 360) / usedChannels.value}, 100%, 50%)`,
+      strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value - 125) % 360}, 100%, 73%)`,
       fillToBottom: false,
-      interpolation: 'bezier'
+      interpolation: 'linear'
     })
   }
 }
@@ -161,6 +231,20 @@ const connect = async () => {
     console.error('Failed to connect:', error)
     loading.value = false
   }
+}
+
+const mark = () => {
+  console.log('mark')
+}
+
+const startRecording = () => {
+  recording.value = true
+  console.log('startRecording')
+}
+
+const stopRecording = () => {
+  recording.value = false
+  console.log('stopRecording')
 }
 
 const disconnect = async () => {
