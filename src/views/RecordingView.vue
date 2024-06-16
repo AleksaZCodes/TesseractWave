@@ -14,7 +14,7 @@
         v-else
         class="skeleton bg-base-200 w-full h-full flex justify-center items-center gap-2 italic"
       >
-        <i class="fa-solid fa-chart-line"></i> One chart layout
+        <i class="fa-solid fa-chart-line text-primary"></i> One chart layout
       </div>
       <!-- <div class="flex justify-around items-center w-full gap-2"> -->
       <!-- <Slider class="w-[60%]" v-model="xresolution" :min="1" :max="100" :step="1" /> -->
@@ -174,7 +174,7 @@ const createChannelTimeSeries = () => {
 
     smoothie.addTimeSeries(series, {
       lineWidth: 3,
-      strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value - 125) % 360}, 100%, 73%)`,
+      strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value - 211) % 360}, 59%, 54%)`,
       fillToBottom: false,
       interpolation: 'linear'
     })
