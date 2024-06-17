@@ -14,16 +14,8 @@
         v-else
         class="skeleton bg-base-200 w-full h-full flex justify-center items-center gap-2 italic"
       >
-        <i class="fa-solid fa-chart-line text-primary"></i> One chart layout
+        <i class="fa-solid fa-chart-line text-primary"></i> Single chart layout
       </div>
-      <!-- <div class="flex justify-around items-center w-full gap-2"> -->
-      <!-- <Slider class="w-[60%]" v-model="xresolution" :min="1" :max="100" :step="1" /> -->
-
-      <!-- <div
-          class="h-2 bg-primary rounded-full flex justify-center items-center"
-          :class="`w-[${Math.round(1000 / xresolution[0])}px]`"
-        ></div> -->
-      <!-- </div> -->
     </div>
 
     <div class="card flex flex-row justify-center items-center gap-2">
@@ -97,33 +89,22 @@
       </div>
 
       <h4>Used channels</h4>
-      <div class="flex gap-2 justify-between items-center mb-4">
-        <input
-          type="range"
-          min="1"
-          max="6"
-          v-model="usedChannels"
-          class="range range-primary"
-          step="1"
-        />
-        <span class="w-[4.5ch] text-right">{{ usedChannels }}</span>
-      </div>
-      <!-- <div class="grid grid-cols-6 gap-3 md:gap-5">
-        <label class="swap swap-flip" v-for="label in channelLabels" :key="label">
-          <input type="checkbox" />
+      <div class="grid grid-cols-6 gap-3 md:gap-5">
+        <label class="swap swap-flip" v-for="(label, index) in channelLabels" :key="label">
+          <input type="checkbox" v-model="usedChannels[index]" />
 
           <div
-            class="swap-on card w-10 md:w-12 bg-primary text-base-100 font-bold aspect-square justify-center items-center"
+            class="swap-on card rounded-2xl w-10 md:w-12 bg-primary text-base-100 font-bold aspect-square justify-center items-center"
           >
             {{ label }}
           </div>
           <div
-            class="swap-off card w-10 md:w-12 bg-base-200 font-bold aspect-square justify-center items-center"
+            class="swap-off card rounded-2xl w-10 md:w-12 bg-base-200 font-bold aspect-square justify-center items-center"
           >
             {{ label }}
           </div>
         </label>
-      </div> -->
+      </div>
 
       <div class="modal-action">
         <form method="dialog">
@@ -137,7 +118,7 @@
 <script setup>
 import NavBar from '@/components/NavBar.vue'
 import { SmoothieChart, TimeSeries } from 'smoothie'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 const loading = ref(false)
 const connected = ref(false)
@@ -148,7 +129,8 @@ const channelTimeSeries = ref([]) // Array to hold TimeSeries for each channel
 const channelLabels = ref([])
 const sampling = ref(false)
 const recording = ref(false)
-const usedChannels = ref(6)
+const availableChannels = ref(6)
+const usedChannels = ref([1, 0, 0, 0, 0, 0]) // Initialize usedChannels as an array
 const samplingRate = ref(100)
 const readPromise = ref(null)
 const chartContainer = ref(null)
@@ -168,16 +150,18 @@ const smoothie = new SmoothieChart({
 // Function to create TimeSeries for each channel
 const createChannelTimeSeries = () => {
   channelTimeSeries.value = []
-  for (let i = 0; i < usedChannels.value; i++) {
-    const series = new TimeSeries()
-    channelTimeSeries.value.push(series)
+  for (let i = 0; i < availableChannels.value; i++) {
+    if (usedChannels.value[i]) {
+      const series = new TimeSeries()
+      channelTimeSeries.value.push(series)
 
-    smoothie.addTimeSeries(series, {
-      lineWidth: 3,
-      strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value - 211) % 360}, 59%, 54%)`,
-      fillToBottom: false,
-      interpolation: 'linear'
-    })
+      smoothie.addTimeSeries(series, {
+        lineWidth: 3,
+        strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value.length - 211) % 360}, 59%, 54%)`,
+        fillToBottom: false,
+        interpolation: 'linear'
+      })
+    }
   }
 }
 
@@ -199,6 +183,9 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
+
+// Watch usedChannels and re-create the TimeSeries if it changes
+watch(usedChannels, createChannelTimeSeries)
 
 const connect = async () => {
   try {
@@ -262,7 +249,8 @@ const disconnect = async () => {
 const sendSettings = async () => {
   if (!port.value) return
   const writer = port.value.writable.getWriter()
-  const command = `s${sampling.value ? '1' : '0'},${usedChannels.value},${samplingRate.value}\n`
+  const usedChannelsStr = usedChannels.value.map((used) => (used ? 1 : 0)).join('')
+  const command = `s${sampling.value ? '1' : '0'},${samplingRate.value},${usedChannelsStr}\n`
   await writer.write(new TextEncoder().encode(command))
   writer.releaseLock()
 }
@@ -298,9 +286,12 @@ const getInfo = async () => {
   const decoded = received.trim().split('\r\n')[0].split(',')
 
   if (decoded.length >= 2) {
-    usedChannels.value = parseInt(decoded[0])
+    availableChannels.value = parseInt(decoded[0])
     samplingRate.value = parseInt(decoded[1])
-    channelLabels.value = decoded.slice(2)
+    channelLabels.value = decoded.slice(2, availableChannels.value + 2)
+    usedChannels.value = decoded
+      .slice(availableChannels.value + 2)
+      .map((used) => (used == 1 ? true : false))
   } else {
     console.error('Invalid info format received')
   }
@@ -309,7 +300,7 @@ const getInfo = async () => {
 const startSampling = async () => {
   sampling.value = true
   await sendSettings()
-  createChannelTimeSeries() // Create TimeSeries for each channel
+  createChannelTimeSeries()
   smoothie.streamTo(document.getElementById('chart'), 0)
   readPromise.value = readSamples()
 }
@@ -339,6 +330,7 @@ const readSamples = async () => {
         channels.value = line.split(',').map((value) => parseInt(value))
         channels.value.forEach((value, index) => {
           if (channelTimeSeries.value[index]) {
+            console.log(index)
             channelTimeSeries.value[index].append(Date.now(), value)
           }
         })
