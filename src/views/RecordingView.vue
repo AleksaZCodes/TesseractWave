@@ -91,7 +91,14 @@
       <h4>Used channels</h4>
       <div class="grid grid-cols-6 gap-3 md:gap-5">
         <label class="swap swap-flip" v-for="(label, index) in channelLabels" :key="label">
-          <input type="checkbox" v-model="usedChannels[index]" />
+          <input
+            type="checkbox"
+            :disabled="
+              usedChannels[index] &&
+              usedChannels.reduce((count, value) => count + (value === true), 0) === 1
+            "
+            v-model="usedChannels[index]"
+          />
 
           <div
             class="swap-on card rounded-2xl w-10 md:w-12 bg-primary text-base-100 font-bold aspect-square justify-center items-center"
@@ -157,7 +164,7 @@ const createChannelTimeSeries = () => {
 
       smoothie.addTimeSeries(series, {
         lineWidth: 3,
-        strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value.length - 211) % 360}, 59%, 54%)`,
+        strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value.reduce((count, value) => count + (value === true), 0) - 211) % 360}, 59%, 54%)`,
         fillToBottom: false,
         interpolation: 'linear'
       })
@@ -330,7 +337,6 @@ const readSamples = async () => {
         channels.value = line.split(',').map((value) => parseInt(value))
         channels.value.forEach((value, index) => {
           if (channelTimeSeries.value[index]) {
-            console.log(index)
             channelTimeSeries.value[index].append(Date.now(), value)
           }
         })
