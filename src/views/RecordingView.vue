@@ -157,17 +157,25 @@ const smoothie = new SmoothieChart({
 // Function to create TimeSeries for each channel
 const createChannelTimeSeries = () => {
   channelTimeSeries.value = []
-  for (let i = 0; i < availableChannels.value; i++) {
+  const numberOfUsedChannels = usedChannels.value.reduce(
+    (count, value) => count + (value === true),
+    0
+  )
+  for (let i = 0, j = 1; i < availableChannels.value; i++) {
     if (usedChannels.value[i]) {
       const series = new TimeSeries()
       channelTimeSeries.value.push(series)
 
       smoothie.addTimeSeries(series, {
         lineWidth: 3,
-        strokeStyle: `hsl(${(((i + 1) * 360) / usedChannels.value.reduce((count, value) => count + (value === true), 0) - 211) % 360}, 59%, 54%)`,
+        strokeStyle: `hsl(${((j * 360) / numberOfUsedChannels - 211) % 360}, 59%, 54%)`,
         fillToBottom: false,
         interpolation: 'linear'
       })
+
+      if (usedChannels.value[i]) {
+        j++
+      }
     }
   }
 }
