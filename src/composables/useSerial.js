@@ -1,4 +1,5 @@
 import { ref, watch } from 'vue'
+import StreamSaver from 'streamsaver'
 
 export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) {
   const port = ref(null)
@@ -7,11 +8,19 @@ export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) 
   const sampling = ref(false)
   const recording = ref(false)
   const readPromise = ref(null)
+  const boardName = ref('')
   const availableChannels = ref(6)
   const usedChannels = ref([1, 0, 0, 0, 0, 0])
   const samplingRate = ref(100)
   const channels = ref([])
   const channelLabels = ref([])
+
+  const toMark = ref(0)
+
+  // CSV buffer
+  const sampleCounter = ref(0)
+  let fileStream
+  let writer
 
   const connect = async () => {
     try {
@@ -50,17 +59,37 @@ export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) 
   }
 
   const mark = () => {
-    console.log('mark')
+    if (!recording.value) return
+    toMark.value = 1
   }
 
   const startRecording = () => {
     recording.value = true
-    console.log('startRecording')
+    sampleCounter.value = 0
+
+    const filename = `recording-${boardName.value}-${Date.now()}-${samplingRate.value}`
+    const usedChannelLabels = usedChannels.value
+      .filter((channel) => channel)
+      .map((channel) => channelLabels.value[usedChannels.value.indexOf(channel)])
+    const fileExtension = `${filename}-${usedChannelLabels.join('-')}.csv`
+    fileStream = StreamSaver.createWriteStream(fileExtension)
+    writer = fileStream.getWriter()
+
+    // Write CSV header
+    const header = [
+      'timestamp',
+      'sample',
+      ...usedChannels.value
+        .filter((channel) => channel)
+        .map((channel) => channelLabels.value[usedChannels.value.indexOf(channel)]),
+      'mark'
+    ].join(',')
+    writer.write(new TextEncoder().encode(header + '\n'))
   }
 
   const stopRecording = () => {
     recording.value = false
-    console.log('stopRecording')
+    writer.close()
   }
 
   const disconnect = async () => {
@@ -69,6 +98,11 @@ export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) 
       port.value = null
       connected.value = false
       sampling.value = false
+      readPromise.value = null
+      fileStream = null
+      writer = null
+      toMark.value = 0
+      boardName.value = ''
     }
   }
 
@@ -111,12 +145,13 @@ export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) 
 
     const decoded = received.trim().split('\r\n')[0].split(',')
 
-    if (decoded.length >= 2) {
-      availableChannels.value = parseInt(decoded[0])
-      samplingRate.value = parseInt(decoded[1])
-      channelLabels.value = decoded.slice(2, availableChannels.value + 2)
+    if (decoded.length >= 3) {
+      boardName.value = decoded[0]
+      availableChannels.value = parseInt(decoded[1])
+      samplingRate.value = parseInt(decoded[2])
+      channelLabels.value = decoded.slice(3, availableChannels.value + 3)
       usedChannels.value = decoded
-        .slice(availableChannels.value + 2)
+        .slice(availableChannels.value + 3)
         .map((used) => (used == 1 ? true : false))
     } else {
       console.error('Invalid info format received')
@@ -153,12 +188,25 @@ export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) 
         buffer = lines.pop()
 
         for (let line of lines) {
-          channels.value = line.split(',').map((value) => parseInt(value))
-          channels.value.forEach((value, index) => {
+          const channelsData = line.split(',').map((value) => parseInt(value))
+          channels.value = channelsData
+          channelsData.forEach((value, index) => {
             if (channelTimeSeries.value[index]) {
               channelTimeSeries.value[index].append(Date.now(), value)
             }
           })
+          if (recording.value) {
+            const row = [
+              Date.now(),
+              sampleCounter.value++,
+              ...usedChannels.value
+                .filter((channel, index) => channel && channelsData[index])
+                .map((channel, index) => channelsData[index]),
+              toMark.value
+            ].join(',')
+            writer.write(new TextEncoder().encode(row + '\n'))
+            toMark.value = 0
+          }
         }
       }
     } catch (error) {
@@ -178,6 +226,7 @@ export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) 
     startSampling,
     stopSampling,
     mark,
+    boardName,
     samplingRate,
     availableChannels,
     usedChannels,

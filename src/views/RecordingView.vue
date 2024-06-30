@@ -12,9 +12,14 @@
       ></canvas>
       <div
         v-else
-        class="skeleton bg-base-200 w-full h-full flex justify-center items-center gap-2 italic"
+        class="skeleton bg-base-200 w-full h-full flex flex-col justify-center items-center gap-2 italic"
       >
-        <i class="fa-solid fa-chart-line text-primary"></i> Single chart layout
+        <div v-if="boardName" class="flex gap-2 justify-center items-center">
+          <i class="fa-solid fa-link text-primary"></i> {{ boardName }}
+        </div>
+        <div class="flex gap-2 justify-center items-center">
+          <i class="fa-solid fa-chart-line text-primary"></i> Single chart layout
+        </div>
       </div>
     </div>
 
@@ -41,7 +46,12 @@
         <i class="fa-solid fa-scissors text-primary"></i> Mark
       </button>
 
-      <button class="btn" v-if="connected" @click="sampling ? stopSampling() : startSampling()">
+      <button
+        class="btn"
+        v-if="connected"
+        @click="sampling ? stopSampling() : startSampling()"
+        :disabled="recording"
+      >
         <i
           class="fa-solid"
           :class="[
@@ -75,7 +85,7 @@
   </div>
   <dialog id="options" class="modal">
     <div class="modal-box prose">
-      <h3 class="font-bold">Recording options</h3>
+      <h3 class="font-bold">Recording options for {{ boardName }}</h3>
 
       <h4>Sampling rate</h4>
       <div class="flex gap-2 justify-between items-center">
@@ -168,6 +178,7 @@ const {
   startSampling,
   stopSampling,
   mark,
+  boardName,
   samplingRate,
   availableChannels,
   usedChannels,

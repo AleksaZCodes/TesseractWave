@@ -1,0 +1,6 @@
+TesseractWave  KEYWORD1
+begin          KEYWORD2
+loop           KEYWORD2
+parseSettingsCommand  KEYWORD2
+sendInfo       KEYWORD2
+sample         KEYWORD2

@@ -1,48 +1,86 @@
 import serial
 import time
 
-# Available channels with the according pins and labels
-pin_labels = ["A0", "A1", "A2", "A3", "A4", "A5"]
-num_channels = len(pin_labels)
-used_channels = [1, 0, 0, 0, 0, 0]
-sampling = False
-sampling_rate = 100
-num_used_channels = sum(used_channels)
+class Board:
+    def __init__(self, board_name, pins, pin_labels):
+        self.board_name = board_name
+        self.pins = pins
+        self.pin_labels = pin_labels
+        self.num_channels = len(pins)
+        self.sampling = False
+        self.sampling_rate = 100
+        self.used_channels = [1] + [0] * (self.num_channels - 1)
+        self.num_used_channels = 1
+        self.ser = serial.Serial('COM15', 115200, timeout=1)  # Update the port as needed
 
-def send_info(ser):
-    info = f"{num_channels},{sampling_rate}," + ",".join(pin_labels) + "," + ",".join(map(str, used_channels))
-    ser.write(info.encode() + b'\n')
+    def begin(self):
+        time.sleep(1.0)
+        self.send_message("READY")
+        time.sleep(1.0)
 
-def parse_settings_command(command):
-    global sampling, sampling_rate, used_channels, num_used_channels
-    parts = command.strip().split(',')
-    sampling = (parts[0][1] == '1')
-    sampling_rate = int(parts[1])
-    used_channels = [int(x) for x in parts[2]]
-    num_used_channels = sum(used_channels)
-    print(sampling, sampling_rate, used_channels, num_used_channels, sep='  ')
-    ser.write(b"OK\r\n")
+    def set_pin_mode(self, pin, mode):
+        # Placeholder for setting pin mode
+        pass
 
-def sample(ser):
-    values = [(i + 1)*1000/num_channels for i in range(num_channels) if used_channels[i] == 1]
-    ser.write((','.join(map(str, values)) + '\r\n').encode())
-    time.sleep(1 / sampling_rate)
+    def send_message(self, message):
+        self.ser.write((message + '\r\n').encode())
 
-# Open the virtual serial port
-ser = serial.Serial('COM15', 115200, timeout=1)
+    def read_message(self):
+        return self.ser.readline().decode().strip()
 
-ser.write(b"READY\r\n")
-print('sent "READY"')
+    def loop(self):
+        if self.sampling:
+            self.sample()
 
-try:
-    while True:
-        if ser.in_waiting > 0:
-            command = ser.readline().decode().strip()
+        if self.ser.in_waiting:
+            command = self.read_message()
             if command.startswith('s'):
-                parse_settings_command(command)
+                self.parse_settings_command(command)
             elif command.startswith('i'):
-                send_info(ser)
-        if sampling:
-            sample(ser)
-except KeyboardInterrupt:
-    ser.close()
+                self.send_info()
+        
+        time.sleep(1 / self.sampling_rate)
+
+    def parse_settings_command(self, command):
+        parts = command.split(',')
+        self.sampling = (parts[0][1] == '1')
+        self.sampling_rate = int(parts[1])
+        used_channels_str = parts[2]
+        self.used_channels = [1 if c == '1' else 0 for c in used_channels_str]
+
+        self.num_used_channels = sum(self.used_channels)
+
+        self.send_message("OK")
+
+    def send_info(self):
+        info = f"{self.board_name},{self.num_channels},{self.sampling_rate},"
+        info += ",".join(self.pin_labels) + ","
+        info += ",".join(str(c) for c in self.used_channels)
+
+        self.send_message(info)
+
+    def sample(self):
+        values = []
+        for i in self.pins:
+            if self.used_channels[i] == 1:
+                value = self.read_analog(i)
+                values.append(str(value))
+
+        self.send_message(",".join(values))
+        time.sleep(1.0 / self.sampling_rate)
+
+    def read_analog(self, pin):
+        # Placeholder for reading analog value
+        return (pin + 1) * 100
+
+# Example usage
+pins = range(6)  # Example pin numbers
+pin_labels = ["A0", "A1", "A2", "A3", "A4", "A5"]
+board = Board("Simulator", pins, pin_labels)
+board.begin()
+
+while True:
+    try:
+        board.loop()
+    except KeyboardInterrupt:
+        break
