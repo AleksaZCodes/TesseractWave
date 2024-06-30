@@ -16,7 +16,7 @@
         </ul>
       </div>
       <a class="btn btn-ghost text-xl text-primary">
-        <i class="fa-solid fa-cubes text-2xl"></i> Tesseract Synapse
+        <i class="fa-solid fa-file-waveform text-2xl"></i> Tesseract Wave
       </a>
     </div>
     <div class="navbar-end hidden lg:flex">

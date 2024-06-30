@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.tesseract.synapse"
+    namespace "com.tesseract.wave"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.tesseract.synapse"
+        applicationId "com.tesseract.wave"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
