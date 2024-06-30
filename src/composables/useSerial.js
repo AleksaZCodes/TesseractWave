@@ -69,21 +69,15 @@ export function useSerial(createChannelTimeSeries, streamTo, channelTimeSeries) 
 
     const filename = `recording-${boardName.value}-${Date.now()}-${samplingRate.value}`
     const usedChannelLabels = usedChannels.value
-      .filter((channel) => channel)
-      .map((channel) => channelLabels.value[usedChannels.value.indexOf(channel)])
+      .map((channel, index) => ({ channel, index }))
+      .filter((item) => item.channel)
+      .map((item) => channelLabels.value[item.index])
     const fileExtension = `${filename}-${usedChannelLabels.join('-')}.csv`
     fileStream = StreamSaver.createWriteStream(fileExtension)
     writer = fileStream.getWriter()
 
     // Write CSV header
-    const header = [
-      'timestamp',
-      'sample',
-      ...usedChannels.value
-        .filter((channel) => channel)
-        .map((channel) => channelLabels.value[usedChannels.value.indexOf(channel)]),
-      'mark'
-    ].join(',')
+    const header = ['timestamp', 'sample', ...usedChannelLabels, 'mark'].join(',')
     writer.write(new TextEncoder().encode(header + '\n'))
   }
 
